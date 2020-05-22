@@ -1,9 +1,26 @@
 "This file contains techniques for extracting data from HTML pages."
 import bs4
 
+LXML_AVAILABLE = False
 
-def init_bs(html):
-    return bs4.BeautifulSoup(html, features="html5lib")
+try:
+    import lxml
+    LXML_AVAILABLE = True
+except ImportError:
+    pass
+
+
+def init_bs(html, head_only=False):
+    features = "html5lib"
+    parse_only = None
+
+    if LXML_AVAILABLE:
+        features = "lxml"
+
+        if head_only:
+            parse_only = bs4.SoupStrainer("head")
+
+    return bs4.BeautifulSoup(html, features=features, parse_only=parse_only)
 
 
 class Technique(object):
@@ -14,7 +31,7 @@ class Technique(object):
         """
         self.extractor = extractor
         super(Technique, self).__init__(*args, **kwargs)
-    
+
     def extract(self, html):
         "Extract data from a string representing an HTML document."
         return {'titles': [],
@@ -48,7 +65,7 @@ class HeadTags(Technique):
     def extract(self, html):
         "Extract data from meta, link and title tags within the head tag."
         extracted = {}
-        soup = init_bs(html)
+        soup = init_bs(html, head_only=True)
         # extract data from title tag
         title_tag = soup.find('title')
         if title_tag:
@@ -114,7 +131,7 @@ class FacebookOpengraphTags(Technique):
     def extract(self, html):
         "Extract data from Facebook Opengraph tags."
         extracted = {}
-        soup = init_bs(html)
+        soup = init_bs(html, head_only=True)
         for meta_tag in soup.find_all('meta'):
             if self.key_attr in meta_tag.attrs and 'content' in meta_tag.attrs:
                 property = meta_tag[self.key_attr]
@@ -144,7 +161,7 @@ class HTML5SemanticTags(Technique):
     The HTML5 `article` tag, and also the `video` tag give us some useful
     hints for extracting page information for the sites which happen to
     utilize these tags.
-    
+
     This technique will extract information from pages formed like::
 
         <html>
@@ -166,7 +183,7 @@ class HTML5SemanticTags(Technique):
     of cases where it hits, and otherwise expects `SemanticTags` to run sweep
     behind it for the lower quality, more abundant hits it discovers.
     """
-    
+
     def extract(self, html):
         "Extract data from HTML5 semantic tags."
         titles = []
@@ -207,12 +224,12 @@ class SemanticTags(Technique):
                       ]
     # format is ("name of tag", "destination list", "name of attribute" store_first_n)
     extract_attr = [('img', 'images', 'src', 10)]
-    
+
     def extract(self, html):
         "Extract data from usual semantic tags."
         extracted = {}
         soup = init_bs(html)
-        
+
         for tag, dest, max_to_store in self.extract_string:
             for found in soup.find_all(tag)[:max_to_store] or []:
                 if dest not in extracted:
@@ -227,5 +244,5 @@ class SemanticTags(Technique):
                     extracted[dest].append(found[attribute])
 
         return extracted
-    
-    
+
+
